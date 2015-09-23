@@ -67,6 +67,13 @@ try:
     IMPORTS.append('beautifulsoup')
 except ImportError:
     pass
+
+try:
+    from docx import Document
+    IMPORTS.append('docx')
+except ImportError:
+    pass
+
 try:
     import requests
     IMPORTS.append('requests')
@@ -109,6 +116,10 @@ class IOC_Parser(object):
         elif input_format == 'html':
             if 'beautifulsoup' not in IMPORTS:
                 e = 'HTML parser library not found: BeautifulSoup'
+                raise ImportError(e)
+        elif input_format == 'docx':
+            if 'docx' not in IMPORTS:
+                e = 'DOCX parser library not found: docx.Document'
                 raise ImportError(e)
 
     def load_patterns(self, fpath):
@@ -178,7 +189,7 @@ class IOC_Parser(object):
     def parse_pdf_pdfminer(self, f, fpath):
         try:
             laparams = LAParams()
-            laparams.all_texts = True  
+            laparams.all_texts = True
             rsrcmgr = PDFResourceManager()
             pagenos = set()
 
@@ -211,7 +222,7 @@ class IOC_Parser(object):
         except AttributeError:
             e = 'Selected PDF parser library is not supported: %s' % (self.library)
             raise NotImplementedError(e)
-            
+
         self.parser_func(f, fpath)
 
     def parse_txt(self, f, fpath):
@@ -228,11 +239,22 @@ class IOC_Parser(object):
         except Exception as e:
             self.handler.print_error(fpath, e)
 
+    def parse_docx(self, f, fpath):
+        doc = Document(fpath)
+
+        all_text = ""
+
+        all_text = "\r\n".join([p.text for p in doc.paragraphs])
+
+        self.handler.print_header(fpath)
+        self.parse_page(fpath, all_text, 1)
+        self.handler.print_footer(fpath)
+
     def parse_html(self, f, fpath):
         try:
             if self.dedup:
                 self.dedup_store = set()
-                
+
             data = f.read()
             soup = BeautifulSoup(data)
             html = soup.findAll(text=True)
