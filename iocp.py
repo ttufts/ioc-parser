@@ -251,12 +251,73 @@ class IOC_Parser(object):
         except Exception as e:
             self.handler.print_error(fpath, e)
 
+
+    def find_hyperlink(self, object):
+        if hasattr(object, "tag"):
+            if "hyperlink" in object.tag:
+                p = self.get_all_text(object)
+                return p
+            else:
+                hyperlinks = []
+                for child in object.getchildren():
+                    text = self.find_hyperlink(child)
+                    if type(text) == str:
+                        hyperlinks.append(text)
+                    elif type(text) == list:
+                        hyperlinks.extend(text)
+                if hyperlinks != []:
+                    return ", ".join(hyperlinks)
+                else:
+                    return None
+        else:
+            print "NO TAG"
+
+    def get_all_text(self, object):
+        if object.getchildren() == []:
+            # print object.text
+            if object.text is not None:
+                return [object.text]
+            else:
+                return None
+        else:
+            text = []
+            for child in object.getchildren():
+                t = self.get_all_text(child)
+                if t is not None:
+                    text.extend(t)
+            return "".join(text)
+
+
     def parse_docx(self, f, fpath):
         doc = Document(fpath)
 
         all_text = ""
 
         all_text = "\r\n".join([p.text for p in doc.paragraphs])
+
+        all_text += " "
+
+        for paragraph in doc.paragraphs:
+            hyperlinks = self.find_hyperlink(paragraph._p)
+            if hyperlinks is not None:
+                all_text += hyperlinks
+                all_text += " "
+
+
+        table_text = ""
+
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    table_text += "\r\n".join([p.text for p in cell.paragraphs])
+                    table_text += " "
+
+            hyperlinks = self.find_hyperlink(table._tbl)
+            if hyperlinks is not None:
+                all_text += hyperlinks
+                all_text += " "
+
+        all_text = all_text + table_text
 
         self.handler.print_header(fpath)
         self.parse_page(fpath, all_text, 1)
